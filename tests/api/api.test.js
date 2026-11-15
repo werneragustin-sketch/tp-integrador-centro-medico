@@ -81,6 +81,13 @@ describe('Endpoints anónimos vs privados', () => {
     expect(res.body.datos[0]).not.toHaveProperty('passwordHash');
   });
 
+  test('una página fuera de rango viene vacía pero informa el total real', async () => {
+    const res = await request(app).get('/api/medicos?pagina=5&limite=10');
+    expect(res.status).toBe(200);
+    expect(res.body.datos).toEqual([]);
+    expect(res.body.paginacion).toEqual({ pagina: 5, limite: 10, total: 2, totalPaginas: 1 });
+  });
+
   test('GET /api/turnos sin token -> 401', async () => {
     const res = await request(app).get('/api/turnos');
     expect(res.status).toBe(401);

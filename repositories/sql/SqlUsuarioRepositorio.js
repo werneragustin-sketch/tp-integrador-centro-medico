@@ -84,8 +84,22 @@ class SqlUsuarioRepositorio extends IUsuarioRepositorio {
     const filas = resultado.recordset;
     return {
       items: filas.map(({ total, ...fila }) => aUsuario(fila)),
-      total: filas.length ? filas[0].total : 0,
+      // Si la página pedida está vacía no hay filas de donde leer el total: se cuenta aparte.
+      total: filas.length ? filas[0].total : await this.#contarMedicos(especialidad),
     };
+  }
+
+  async #contarMedicos(especialidad) {
+    const resultado = await this.pool
+      .request()
+      .input('Especialidad', sql.NVarChar(100), especialidad)
+      .query(`
+        SELECT COUNT(*) AS total
+        FROM dbo.Usuarios u
+        JOIN dbo.Medicos m ON m.ID_Medico = u.ID_Usuario
+        WHERE u.Rol = 'MEDICO' AND u.Activo = 1
+          AND (@Especialidad IS NULL OR m.Especialidad = @Especialidad)`);
+    return resultado.recordset[0].total;
   }
 }
 
