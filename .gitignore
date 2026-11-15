@@ -1,0 +1,9 @@
+# Dependencias (se instalan con npm install)
+node_modules/
+
+# Variables de entorno con secretos: NUNCA se suben. Usar .env.example como guía.
+.env
+
+# Reportes y logs
+coverage/
+*.log

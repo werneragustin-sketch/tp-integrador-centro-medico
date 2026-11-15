@@ -1,0 +1,286 @@
+{
+  "info": {
+    "name": "Centro Médico - TP Integrador",
+    "description": "Recorrido completo de la API. Correr las carpetas en orden: los logins guardan los tokens y el alta de turno guarda el turnoId en variables de la colección.\n\nAntes de empezar: completar la variable iotApiKey con el valor de IOT_API_KEY del .env.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:3000" },
+    { "key": "iotApiKey", "value": "pegar-aca-IOT_API_KEY-del-.env" },
+    { "key": "tokenPaciente", "value": "" },
+    { "key": "tokenMedico", "value": "" },
+    { "key": "turnoId", "value": "" },
+    { "key": "fechaTurno", "value": "" },
+    { "key": "fechaReprogramada", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "1. Endpoints anónimos",
+      "item": [
+        {
+          "name": "Salud de la API",
+          "request": { "method": "GET", "url": "{{baseUrl}}/" }
+        },
+        {
+          "name": "Cartilla de médicos (paginada)",
+          "request": { "method": "GET", "url": "{{baseUrl}}/api/medicos?pagina=1&limite=10" }
+        },
+        {
+          "name": "Médicos por especialidad",
+          "request": { "method": "GET", "url": "{{baseUrl}}/api/medicos?especialidad=Cardiología" }
+        },
+        {
+          "name": "Registro de paciente",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Ana Torres\",\n  \"email\": \"ana.torres@correo.test\",\n  \"password\": \"Demo1234!\",\n  \"obraSocial\": \"Galeno\"\n}"
+            },
+            "url": "{{baseUrl}}/api/auth/registro"
+          }
+        },
+        {
+          "name": "Sin token -> 401",
+          "request": { "method": "GET", "url": "{{baseUrl}}/api/turnos" }
+        }
+      ]
+    },
+    {
+      "name": "2. Paciente (Juan Pérez)",
+      "item": [
+        {
+          "name": "Login paciente",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const datos = pm.response.json();",
+                  "pm.collectionVariables.set('tokenPaciente', datos.token);",
+                  "pm.test('login OK', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"juan.perez@correo.test\",\n  \"password\": \"Demo1234!\"\n}" },
+            "url": "{{baseUrl}}/api/auth/login"
+          }
+        },
+        {
+          "name": "Mi perfil",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{tokenPaciente}}", "type": "string" }] },
+            "method": "GET",
+            "url": "{{baseUrl}}/api/auth/perfil"
+          }
+        },
+        {
+          "name": "Mis turnos",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{tokenPaciente}}", "type": "string" }] },
+            "method": "GET",
+            "url": "{{baseUrl}}/api/turnos?pagina=1&limite=10"
+          }
+        },
+        {
+          "name": "Pedir turno con la Dra. Gómez",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const d = new Date();",
+                  "d.setUTCDate(d.getUTCDate() + 7);",
+                  "d.setUTCHours(16, 0, 0, 0); // 13 hs de Argentina",
+                  "pm.collectionVariables.set('fechaTurno', d.toISOString());",
+                  "d.setUTCHours(17);",
+                  "pm.collectionVariables.set('fechaReprogramada', d.toISOString());"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) pm.collectionVariables.set('turnoId', pm.response.json().id);",
+                  "pm.test('turno creado PENDIENTE', () => pm.expect(pm.response.json().estado).to.eql('PENDIENTE'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{tokenPaciente}}", "type": "string" }] },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"medicoId\": 1,\n  \"fechaHora\": \"{{fechaTurno}}\",\n  \"motivo\": \"Dolor en el pecho\"\n}" },
+            "url": "{{baseUrl}}/api/turnos"
+          }
+        },
+        {
+          "name": "Mismo horario otra vez -> 409",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{tokenPaciente}}", "type": "string" }] },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"medicoId\": 1,\n  \"fechaHora\": \"{{fechaTurno}}\"\n}" },
+            "url": "{{baseUrl}}/api/turnos"
+          }
+        },
+        {
+          "name": "Reprogramar turno (PUT)",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{tokenPaciente}}", "type": "string" }] },
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"fechaHora\": \"{{fechaReprogramada}}\"\n}" },
+            "url": "{{baseUrl}}/api/turnos/{{turnoId}}"
+          }
+        },
+        {
+          "name": "Paciente intenta confirmar -> 403",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{tokenPaciente}}", "type": "string" }] },
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"estado\": \"CONFIRMADO\"\n}" },
+            "url": "{{baseUrl}}/api/turnos/{{turnoId}}/estado"
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Médico (Dra. Gómez)",
+      "item": [
+        {
+          "name": "Login médico",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.collectionVariables.set('tokenMedico', pm.response.json().token);",
+                  "pm.test('login OK', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"laura.gomez@centromedico.test\",\n  \"password\": \"Demo1234!\"\n}" },
+            "url": "{{baseUrl}}/api/auth/login"
+          }
+        },
+        {
+          "name": "Mi agenda: turnos pendientes",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{tokenMedico}}", "type": "string" }] },
+            "method": "GET",
+            "url": "{{baseUrl}}/api/turnos?estado=PENDIENTE&pagina=1&limite=10"
+          }
+        },
+        {
+          "name": "Confirmar turno (PATCH)",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{tokenMedico}}", "type": "string" }] },
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"estado\": \"CONFIRMADO\"\n}" },
+            "url": "{{baseUrl}}/api/turnos/{{turnoId}}/estado"
+          }
+        },
+        {
+          "name": "Médico no puede pedir turnos -> 403",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{tokenMedico}}", "type": "string" }] },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"medicoId\": 2,\n  \"fechaHora\": \"{{fechaTurno}}\"\n}" },
+            "url": "{{baseUrl}}/api/turnos"
+          }
+        },
+        {
+          "name": "Paciente cancela el turno (DELETE = baja lógica)",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{tokenPaciente}}", "type": "string" }] },
+            "method": "DELETE",
+            "url": "{{baseUrl}}/api/turnos/{{turnoId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. IoT y monitoreo",
+      "item": [
+        {
+          "name": "Dispositivo envía métrica normal",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "x-api-key", "value": "{{iotApiKey}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pacienteId\": 4,\n  \"frecuenciaCardiaca\": 78,\n  \"presionArterial\": \"120/80\",\n  \"dispositivoId\": \"reloj-postman\"\n}"
+            },
+            "url": "{{baseUrl}}/api/metricas"
+          }
+        },
+        {
+          "name": "Dispositivo envía métrica anormal -> alerta",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "x-api-key", "value": "{{iotApiKey}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pacienteId\": 4,\n  \"frecuenciaCardiaca\": 155,\n  \"presionArterial\": \"185/120\",\n  \"dispositivoId\": \"reloj-postman\"\n}"
+            },
+            "url": "{{baseUrl}}/api/metricas"
+          }
+        },
+        {
+          "name": "Sin API key -> 401",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"pacienteId\": 4,\n  \"frecuenciaCardiaca\": 78,\n  \"presionArterial\": \"120/80\"\n}" },
+            "url": "{{baseUrl}}/api/metricas"
+          }
+        },
+        {
+          "name": "Médico ve métricas del paciente 4",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{tokenMedico}}", "type": "string" }] },
+            "method": "GET",
+            "url": "{{baseUrl}}/api/pacientes/4/metricas?pagina=1&limite=5"
+          }
+        },
+        {
+          "name": "Médico ve alertas",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{tokenMedico}}", "type": "string" }] },
+            "method": "GET",
+            "url": "{{baseUrl}}/api/alertas?pagina=1&limite=10"
+          }
+        },
+        {
+          "name": "Paciente intenta ver alertas -> 403",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{tokenPaciente}}", "type": "string" }] },
+            "method": "GET",
+            "url": "{{baseUrl}}/api/alertas"
+          }
+        }
+      ]
+    }
+  ]
+}

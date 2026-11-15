@@ -1,0 +1,56 @@
+# Levanta todo el sistema: SQL Server + MongoDB + API
+#   docker compose up -d --build
+# Las variables salen del archivo .env (ver .env.example).
+services:
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: centromedico-sqlserver
+    environment:
+      ACCEPT_EULA: ${MSSQL_ACCEPT_EULA}
+      MSSQL_SA_PASSWORD: ${SQL_PASSWORD}
+      MSSQL_PID: Developer
+    ports:
+      - "1433:1433"
+    volumes:
+      - sqlserver-datos:/var/opt/mssql
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P \"$${MSSQL_SA_PASSWORD}\" -C -Q \"SELECT 1\" || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 20s
+
+  mongo:
+    image: mongo:8
+    container_name: centromedico-mongo
+    ports:
+      - "27018:27017" # 27018 en la PC para no chocar con un MongoDB local
+    volumes:
+      - mongo-datos:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build: .
+    container_name: centromedico-api
+    env_file: .env
+    environment:
+      PORT: 3000
+      SQL_SERVER: sqlserver
+      SQL_PORT: 1433
+      MONGO_URI: mongodb://mongo:27017/centro_medico
+    ports:
+      - "${PORT:-3000}:3000"
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+      mongo:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  sqlserver-datos:
+  mongo-datos:
