@@ -58,6 +58,18 @@ class AuthServicio {
     return { token, usuario };
   }
 
+  /**
+   * Perfil completo del usuario logueado. El token solo lleva id, nombre, email y rol;
+   * los datos propios de cada rol (obra social, especialidad, matrícula) se leen de la base.
+   */
+  async obtenerPerfil(id) {
+    const usuario = await this.usuarioRepositorio.buscarPorId(id);
+    if (!usuario || !usuario.activo) {
+      throw new ErrorNoAutenticado('El usuario del token ya no existe o está inactivo');
+    }
+    return usuario;
+  }
+
   /** @returns {object} payload del token si es válido */
   verificarToken(token) {
     try {

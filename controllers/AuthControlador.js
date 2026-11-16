@@ -22,8 +22,9 @@ class AuthControlador {
   };
 
   // GET /api/auth/perfil
-  perfil = (req, res) => {
-    res.status(200).json(req.usuario);
+  perfil = async (req, res) => {
+    const usuario = await this.authServicio.obtenerPerfil(req.usuario.id);
+    res.status(200).json(usuario);
   };
 }
 

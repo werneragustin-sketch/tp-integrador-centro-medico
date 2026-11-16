@@ -74,3 +74,23 @@ describe('AuthServicio.login', () => {
     expect(() => servicio.verificarToken(trucho)).toThrow(ErrorNoAutenticado);
   });
 });
+
+describe('AuthServicio.obtenerPerfil', () => {
+  test('trae de la base los datos que no viajan en el token (obra social)', async () => {
+    const { servicio, repo } = crear();
+    const paciente = repo.agregar({ nombre: 'Juan', email: 'juan@test', rol: 'PACIENTE', obraSocial: 'OSDE' });
+
+    const perfil = await servicio.obtenerPerfil(paciente.id);
+
+    expect(perfil.toJSON()).toMatchObject({ rol: 'PACIENTE', obraSocial: 'OSDE' });
+    expect(JSON.stringify(perfil)).not.toContain('passwordHash');
+  });
+
+  test('usuario inexistente o dado de baja -> ErrorNoAutenticado', async () => {
+    const { servicio, repo } = crear();
+    const baja = repo.agregar({ nombre: 'Baja', email: 'baja@test', rol: 'PACIENTE', activo: false });
+
+    await expect(servicio.obtenerPerfil(99)).rejects.toThrow(ErrorNoAutenticado);
+    await expect(servicio.obtenerPerfil(baja.id)).rejects.toThrow(ErrorNoAutenticado);
+  });
+});

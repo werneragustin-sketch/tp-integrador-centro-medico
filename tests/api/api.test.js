@@ -145,6 +145,16 @@ describe('Flujo completo de un turno', () => {
     expect(tokenMedico).toBeTruthy();
   });
 
+  test('3b. el perfil trae los datos propios de cada rol (GET /api/auth/perfil)', async () => {
+    const paciente = await request(app).get('/api/auth/perfil').set('Authorization', `Bearer ${tokenPaciente}`);
+    expect(paciente.status).toBe(200);
+    expect(paciente.body).toMatchObject({ rol: 'PACIENTE', obraSocial: 'OSDE' });
+    expect(paciente.body).not.toHaveProperty('passwordHash');
+
+    const medico = await request(app).get('/api/auth/perfil').set('Authorization', `Bearer ${tokenMedico}`);
+    expect(medico.body).toMatchObject({ rol: 'MEDICO', especialidad: 'Cardiología', matricula: 'MN-10001' });
+  });
+
   test('4. el paciente pide un turno (POST /api/turnos -> 201 PENDIENTE)', async () => {
     const res = await request(app)
       .post('/api/turnos')
